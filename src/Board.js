@@ -50,10 +50,59 @@ export default class Board extends React.Component {
       status: companyDetails[3],
     }));
   }
-  renderSwimlane(name, clients, ref) {
+  renderSwimlane(name, clients, ref, laneKey) {
     return (
-      <Swimlane name={name} clients={clients} dragulaRef={ref}/>
+      <Swimlane name={name} clients={clients} dragulaRef={ref} laneKey={laneKey}/>
     );
+  }
+
+  componentDidMount() {
+    const containers = [
+      this.swimlanes.backlog.current,
+      this.swimlanes.inProgress.current,
+      this.swimlanes.complete.current,
+    ];
+
+    this.drake = Dragula(containers, {
+      revertOnSpill: true,
+    });
+
+    this.drake.on('drop', (el, target, source, sibling) => {
+      const cardId = el.dataset.id;
+      const targetLane = target.dataset.lane;
+
+      const laneToStatus = {
+        backlog: 'backlog',
+        inProgress: 'in-progress',
+        complete: 'complete',
+      };
+
+      // Update internal state (don't call setState yet)
+      const newClients = { ...this.state.clients };
+      newClients.backlog = [...this.state.clients.backlog];
+      newClients.inProgress = [...this.state.clients.inProgress];
+      newClients.complete = [...this.state.clients.complete];
+
+      // Find and update the card
+      Object.keys(newClients).forEach(lane => {
+        const card = newClients[lane].find(c => c.id === cardId);
+        if (card) {
+          card.status = laneToStatus[targetLane];
+        }
+      });
+
+      // Call setState but use a callback to avoid immediate re-render issues
+      this.setState({ clients: newClients }, () => {
+        // Callback after state updates
+      });
+    });
+  }
+
+  componentWillUnmount() {
+    if (this.drake) {
+      this.drake.off('drop');
+      this.drake.destroy();
+    }
   }
 
   render() {
@@ -62,13 +111,13 @@ export default class Board extends React.Component {
         <div className="container-fluid">
           <div className="row">
             <div className="col-md-4">
-              {this.renderSwimlane('Backlog', this.state.clients.backlog, this.swimlanes.backlog)}
+              {this.renderSwimlane('Backlog', this.state.clients.backlog, this.swimlanes.backlog, 'backlog')}
             </div>
             <div className="col-md-4">
-              {this.renderSwimlane('In Progress', this.state.clients.inProgress, this.swimlanes.inProgress)}
+              {this.renderSwimlane('In Progress', this.state.clients.inProgress, this.swimlanes.inProgress, 'inProgress')}
             </div>
             <div className="col-md-4">
-              {this.renderSwimlane('Complete', this.state.clients.complete, this.swimlanes.complete)}
+              {this.renderSwimlane('Complete', this.state.clients.complete, this.swimlanes.complete, 'complete')}
             </div>
           </div>
         </div>
